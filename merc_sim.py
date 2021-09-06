@@ -1,9 +1,11 @@
+import os
+from enum import Enum
+from json import loads
+from random import randint
 from tkinter import *
 from tkinter.ttk import *
-from enum import Enum
+
 from PIL import Image, ImageTk, ImageDraw, ImageFont  # ImageGrab, ImageChops
-import os
-from random import randint
 
 # import ctypes
 #
@@ -11,22 +13,14 @@ from random import randint
 # screensize = g_s(78), g_s(79)
 font_type = os.sep.join(('font', 'GLEI00M_t.ttf'))
 font = ImageFont.truetype(font_type, size=40, index=0, encoding='unic')
-MERC = Enum('MERC', (
-    '-',
-    'Cariel Roame',
-    'Tyrande',
-    'Xyrella',
-    'Rokara',
-))
-MERC_L = {
-    MERC['-']: '----',
-    MERC['Cariel Roame']: '凯瑞尔·罗姆',
-    MERC['Tyrande']: '泰兰德',
-    MERC['Xyrella']: '泽瑞拉',
-    MERC['Rokara']: '洛卡拉',
-}
+with open('data.json', 'r', encoding='utf-8') as _f_:
+    d = loads(_f_.read())
+MERC = Enum('MERC', tuple(d[0]))
+MERC_L = {}
+for _count in range(len(d[0])):
+    MERC_L[MERC[d[0][_count]]] = d[1][_count]
 MERC_L_R = dict(zip(MERC_L.values(), MERC_L.keys()))
-MERC_L_CB = tuple(MERC_L.values())
+MERC_L_CB = d[1]
 
 RACE = Enum('RACE',
             ('-', 'Tauren', 'Human', 'Orc', 'Beast', 'Demon', 'Murloc', 'Element', 'Night Elf', 'Gnome', 'Undead',
@@ -130,30 +124,20 @@ ITEM_D = {
     ITEM['Tome of Judgement']: ['光明圣印额外使目标获得+1攻击力。'] * 5,
 }
 ITEM_LEVEL_CB = (1, 2, 3, 4)
-D = {
-    MERC['-']: (M_TYPE['-'], RACE['-'], (SKILL['-'],), (), (
-        (0, 0), (0, 0),
-    )),
-    MERC['Cariel Roame']: (M_TYPE['Protector'], RACE['Human'], (
-        ITEM['Hammer of Dawn'], ITEM['Tome of Light'], ITEM['Tome of Judgement']), (
-                               SKILL["Crusader's Blow"], SKILL['Taunt'], SKILL['Seal of Light']), (
-                               (3, 10), (3, 10),
-                           )),
-    MERC['Tyrande']: (M_TYPE['Fighter'], RACE['Night Elf'], (ITEM['-'], 1), (SKILL['Arcane Shot'],), (
-        (1, 9), (1, 9),
-    )),
-    MERC['Xyrella']: (M_TYPE['Caster'], RACE['Draenei'], (ITEM['-'], 1), (SKILL['Blinding Luminance'],), (
-        (1, 7), (1, 7),
-    )),
-    MERC['Rokara']: (M_TYPE['Fighter'], RACE['Orc'], (ITEM['-'], 1), (SKILL['Arcane Shot'],), (
-        (2, 11), (2, 11),
-    ))}
-L = 1  # 初始等级
+
+D = {}
+for _count in range(len(d[0])):
+    _a_ = d[10][_count].split('_')
+    _abi = int(_a_[0]), int(_a_[1])
+    D[MERC[d[0][_count]]] = (M_TYPE[d[2][_count]], RACE[d[3][_count]],
+                             (ITEM[d[4][_count]], ITEM[d[5][_count]], ITEM[d[6][_count]]),
+                             (SKILL[d[7][_count]], SKILL[d[8][_count]], SKILL[d[9][_count]]), tuple([_abi] * 31))
+L = 30  # 初始等级
 M_SET = [(MERC[n], L, D[MERC[n]][4][L][0], D[MERC[n]][4][L][1], 0, 0, (ITEM['-'], 1), (SKILL['-'], 1, 0), ()) for n in (
     '-', 'Cariel Roame', 'Tyrande', 'Xyrella')]
 params = {
     'w': 1520,
-    'h': 700,
+    'h': 850,
     'x': 50,
     'y': 50,
     't': 1,
@@ -175,6 +159,8 @@ class MainWindow(Tk):
             self.title(f'第{str(self.t)}回合')
             self.w = params['w']
             self.h = params['h']
+            self.cx = 0
+            self.cy = 0
             self.x = params['x']
             self.y = params['y']
             self.merc_img = {
@@ -188,13 +174,16 @@ class MainWindow(Tk):
             self.bg.pack(fill=BOTH)
             self.bg.place(x=-2, y=-2)
 
-            self.canvas = Canvas(self, width=1384, height=400, bd=-2)
-            self.canvas_img = Image.new('RGBA', (1385, 400))
+            self.canvas = Canvas(self, width=1385, height=550, bd=-2)
+            self.canvas_img = Image.new('RGBA', (1385, 550))
+            self.canvas_paint = Image.new('RGBA', (1385, 550))
             with Image.open('canvas.png') as im:
                 self.canvas_img.paste(im.convert('RGBA'), (0, 0))
             self.canvas_imgp = None
             self.canvas.pack()
             self.canvas.place(x=60, y=150)
+            self.canvas.bind('<Button-1>', self.canvas_press)
+            self.canvas.bind('<ButtonRelease-1>', self.canvas_release)
 
             self.widgets_1 = []
             self.widgets_swap_1 = []
@@ -205,7 +194,7 @@ class MainWindow(Tk):
 
             for _c, _w, _s, _u, _y in (
                     ('e', self.widgets_1, self.widgets_swap_1, self.widgets_update_1, 0),
-                    ('a', self.widgets_2, self.widgets_swap_2, self.widgets_update_2, 600)):
+                    ('a', self.widgets_2, self.widgets_swap_2, self.widgets_update_2, 750)):
                 _i = 0
                 for merc in params[_c]:
                     _x = _i * 205 + 50
@@ -285,8 +274,8 @@ class MainWindow(Tk):
                     if _y == 0:
                         __y = 110
                     else:
-                        __y = 565
-                    _update_button.place(x=15 + _x, y=__y)
+                        __y = 715
+                    _update_button.place(x=35 + _x, y=__y)
                     _update_button.bind('<Button-1>', self.update_button)
                     _u.append(_update_button)
 
@@ -294,10 +283,7 @@ class MainWindow(Tk):
                                _atk_entry, _hp_entry, _atk_buff_entry, _hp_buff_entry,
                                _item_combobox, _item_level_combobox,
                                _skill_combobox, _skill_level_combobox, _skill_target_combobox))
-                    if _y == 0:
-                        __y = 150
-                    else:
-                        __y = 370
+
                     self.update_merc_image(_c, _i)
 
                     _i += 1
@@ -337,20 +323,20 @@ class MainWindow(Tk):
 
             self.run_bottum = Button(self, text='下一\n回合', width=5, command=self.run)
             self.run_bottum.pack()
-            self.run_bottum.place(x=1460, y=292)
+            self.run_bottum.place(x=1460, y=367)
 
             self._roll_entry = Entry(self, width=4)
             self._roll_entry.insert(0, '2')
             self._roll_entry.pack()
-            self._roll_entry.place(x=10, y=250)
+            self._roll_entry.place(x=10, y=325)
 
             self.roll_bottum = Button(self, text='掷N\n面骰', width=5, command=self.roll)
             self.roll_bottum.pack()
-            self.roll_bottum.place(x=10, y=280)
+            self.roll_bottum.place(x=10, y=355)
 
             self.update_bottum = Button(self, text='全部\n刷新', width=5, command=self.update_all)
             self.update_bottum.pack()
-            self.update_bottum.place(x=10, y=330)
+            self.update_bottum.place(x=10, y=405)
 
             self.mainloop()
 
@@ -396,10 +382,12 @@ class MainWindow(Tk):
                 _target = self.widgets_1
                 _c = 'e'
                 _id = self.widgets_swap_1.index(event.widget)
+                _w = self.widgets_update_1
             else:
                 _target = self.widgets_2
                 _c = 'a'
                 _id = self.widgets_swap_2.index(event.widget)
+                _w = self.widgets_update_2
             for i in range(11):
                 w_a = _target[_id][i]
                 w_b = _target[_id + 1][i]
@@ -412,11 +400,41 @@ class MainWindow(Tk):
                 else:
                     w_b.set(_a)
                     w_a.set(_b)
-            # 检查是否要更新数据
-            # 更新标签
+            _a = _w[_id]['text']
+            _b = _w[_id + 1]['text']
+            _w[_id].config(text=_b)
+            _w[_id + 1].config(text=_a)
+            if _target[_id][0].get() != _b:
+                self.update_merc(_c, _id)
+            if _target[_id + 1][0].get() != _a:
+                self.update_merc(_c, _id + 1)
             self.update_merc_image(_c, _id)
             self.update_merc_image(_c, _id + 1)
             self.update_canvas()
+
+        def canvas_press(self, event):
+            self.cx, self.cy = event.x, event.y
+
+        def canvas_release(self, event):
+            _x1, _y1 = event.x, event.y
+            if 0 < _x1 < 1385 and 0 < _y1 < 550:
+                _x0, _y0 = self.cx, self.cy
+                if _y0 > 275:
+                    _color = 'green'
+                else:
+                    _color = 'red'
+                _d2 = pow((_x0 - _x1), 2) + pow((_y0 - _y1), 2)
+                if _d2 > 3000:
+                    _draw = ImageDraw.ImageDraw(self.canvas_paint)
+                    _draw.line(((_x0, _y0), (_x1, _y1)), fill=_color, width=10)
+                    _v1, _v2 = _y0 - _y1, _x1 - _x0
+                    _sv = pow(pow(_v1, 2) + pow(_v2, 2), 0.5) / 20
+                    _sv2 = _sv / 2
+                    _p1 = int((_x1 - _x0) / _sv2) + _x1, int((_y1 - _y0) / _sv2) + _y1
+                    _p2 = _x1 + int(_v1 / _sv),  _y1 + int(_v2 / _sv)
+                    _p3 = _x1 - int(_v1 / _sv),  _y1 - int(_v2 / _sv)
+                    _draw.polygon((_p1, _p2, _p3), fill=_color, outline=_color)
+                    self.update_canvas()
 
         def update_merc_image(self, side, pos):
             if side == 'e':
@@ -424,14 +442,14 @@ class MainWindow(Tk):
             else:
                 _info = self.widgets_2[pos]
             _merc_name = MERC_L_R[_info[0].get()]
-            _p = os.path.join('.', 'merc', str(_merc_name.value) + '.png')
-            self.merc_img[side][pos] = Image.new('RGBA', (155, 180))
+            _p = os.path.join('.', 'merc', str(_merc_name.name) + '.png')
+            self.merc_img[side][pos] = Image.new('RGBA', (147, 180))
             if _merc_name == MERC['-']:
                 pass
             else:
                 _draw = ImageDraw.ImageDraw(self.merc_img[side][pos])
                 with Image.open(_p) as im:
-                    self.merc_img[side][pos].paste(im.convert('RGBA').resize((155, 180), Image.LANCZOS), (0, 0))
+                    self.merc_img[side][pos].paste(im.convert('RGBA').resize((147, 180), Image.LANCZOS), (0, 0))
                 _atk = _info[2].get()
                 _atk_int = int(_atk)
                 _raw_atk = D[_merc_name][4][int(_info[1].get())][0]
@@ -441,7 +459,7 @@ class MainWindow(Tk):
                     color = 'green'
                 else:
                     color = 'red'
-                _draw.text((35, 155), _atk, color, font, 'mb', align=CENTER,
+                _draw.text((30, 150), _atk, color, font, 'mb', align=CENTER,
                            stroke_width=2, stroke_fill='black')
                 _hp = _info[3].get()
                 _hp_int = int(_hp)
@@ -452,7 +470,7 @@ class MainWindow(Tk):
                     color = 'green'
                 else:
                     color = 'red'
-                _draw.text((120, 155), _hp, color, font, 'mb', align=CENTER,
+                _draw.text((110, 150), _hp, color, font, 'mb', align=CENTER,
                            stroke_width=2, stroke_fill='black')
 
         def update_params(self):
@@ -487,17 +505,23 @@ class MainWindow(Tk):
             _im = self.canvas_img.copy()
             for _c in ('e', 'a'):
                 for _i in range(7):
-                    _x = 205 * _i
-                    _y = 0 if _c == 'e' else 220
-                    _im.paste(self.merc_img[_c][_i], (_x, _y, _x + 155, _y + 180), self.merc_img[_c][_i])
+                    _x = 205 * _i + 4
+                    _y = 50 if _c == 'e' else 320
+                    _im.paste(self.merc_img[_c][_i], (_x, _y, _x + 147, _y + 180), self.merc_img[_c][_i])
+            _im.paste(self.canvas_paint, mask=self.canvas_paint)
             self.canvas_imgp = ImageTk.PhotoImage(_im)
             self.canvas.create_image((0, 0), image=self.canvas_imgp, anchor=NW)
 
         def update_all(self):
-            for _c in ('e', 'a'):
+            for _c, _t, _u in (('e', self.widgets_1, self.widgets_update_1),
+                               ('a', self.widgets_2, self.widgets_update_2)):
                 for _id in range(7):
-                    self.update_merc(_c, _id)
+                    _a = _t[_id][0].get()
+                    _b = _u[_id]['text']
+                    if _a != _b:
+                        self.update_merc(_c, _id)
                     self.update_merc_image(_c, _id)
+            self.canvas_paint = Image.new('RGBA', (1385, 550))
             self.update_canvas()
 
         def run(self):
@@ -518,8 +542,11 @@ class MainWindow(Tk):
             _imp = ImageTk.PhotoImage(_imm)
             self.bgimg = _imp
         self.geometry(f'{str(self.w)}x{str(self.h)}+{str(self.x)}+{str(self.y)}')
-        self.log = StringVar(value='欢迎使用佣兵沙盘DEMO。\n数值不完整，某些操作会报错。\n'
-                                   '切技能换目标不需要点更新英雄。\n更新英雄会同刷新图片。未来可能补自动结算。\n日志可擦除。\n')
+        self.log = StringVar(
+            value='欢迎使用佣兵沙盘DEMO。\n数值不完整，某些操作会报错。\n切技能换目标不需要点更新英雄。\n更新英雄会同刷新图片。未来可能补自'
+                  '动结算。\n日志可擦除。\n在棋盘上拖动会画箭头，下面起点为绿色，上面起点为红色，左侧全部刷新擦除箭头。\n每个佣兵的控件依次对'
+                  '应：\n【名称】【等级】\n【攻击力】【生命值】\n【装备】【等级】\n【技能】【等级】【目标】\n'
+)
         self.log_label = Text(self)
         self.log_label.insert(END, self.log.get())
         self.log_label.pack(expand=1, fill=BOTH)
