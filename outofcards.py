@@ -3,15 +3,24 @@ import pandas
 from aiohttp import ClientSession, TCPConnector
 from bs4 import BeautifulSoup
 # from bs4.element import NavigableString  # Tag
-from json import dumps
+from json import dumps, loads
 from math import floor
+import os
 # import pandas
+
+U = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.82 Safari/537.36'
+H = {
+    'User-Agent': U,
+    'Accept-Language': 'zh-CN,zh;q=0.9,en-GB;q=0.8,en;q=0.7,en-US;q=0.6',
+    'Accept-Charset': 'application/x-www-form-urlencoded; charset=UTF-8',
+}
 
 
 async def get_url(_url):
+
     while True:
         try:
-            async with ClientSession(connector=TCPConnector(ssl=False)) as session:
+            async with ClientSession(connector=TCPConnector(ssl=False), headers=H) as session:
                 async with session.get(_url) as _r:
                     _t = await _r.text()
             soup = BeautifulSoup(_t, 'html.parser').body
@@ -22,10 +31,27 @@ async def get_url(_url):
             print(_url, e)
 
 
+async def down_url(_url):
+    while True:
+        try:
+            async with ClientSession(connector=TCPConnector(ssl=False), headers=H) as session:
+                async with session.get(_url) as _r:
+                    _t = await _r.read()
+                    _file_name = os.path.join('images', _url.split('/')[-1])
+                    while os.path.exists(_file_name):
+                        _file_name = _file_name.replace('.', '_.')
+                    with open(_file_name, 'wb') as f:
+                        f.write(_t)
+                    return
+        except Exception as e:
+            print(_url, e)
+            await sleep(1.0)
+
+
 async def get_pages(_url):
     while True:
         try:
-            async with ClientSession(connector=TCPConnector(ssl=False)) as session:
+            async with ClientSession(connector=TCPConnector(ssl=False), headers=H) as session:
                 async with session.get(_url) as _r:
                     _t = await _r.text()
             soup = BeautifulSoup(_t, 'html.parser').body
@@ -38,7 +64,7 @@ async def get_pages(_url):
 async def work(_url):
     while True:
         try:
-            async with ClientSession(connector=TCPConnector(ssl=False)) as session:
+            async with ClientSession(connector=TCPConnector(ssl=False), headers=H) as session:
                 async with session.get(_url) as _r:
                     _t = await _r.text()
             soup = BeautifulSoup(_t, 'html.parser')
@@ -124,7 +150,7 @@ async def work(_url):
 async def work2(_url):
     while True:
         try:
-            async with ClientSession(connector=TCPConnector(ssl=False)) as session:
+            async with ClientSession(connector=TCPConnector(ssl=False), headers=H) as session:
                 async with session.get(_url) as _r:
                     _t = await _r.text()
             soup = BeautifulSoup(_t, 'html.parser').body
@@ -163,6 +189,8 @@ def dump_merc():
     urls = []
     for i in range(len(_urls_)):
         urls += _urls_[i]
+    if not os.path.exists('images'):
+        os.makedirs('images')
     tasks = [work(urls[i]) for i in range(len(urls))]
     temp_rs = get_event_loop().run_until_complete(gather(*tasks))
     with open('merc.json', 'w', encoding='utf-8') as f:
@@ -186,11 +214,114 @@ def dump_data():
     pandas.read_json('all.json').to_excel('all.xlsx', index=None)
 
 
+def down_img():
+    urls = set()
+    for _fname in ('merc.json', 'all.json'):
+        with open(_fname, 'r', encoding='utf-8') as f:
+            _data = loads(f.read())
+            for _item in _data:
+                for _img in _item['image_urls']:
+                    if _img:
+                        urls.add(_img)
+    print(len(urls))
+    tasks = [down_url(url) for url in urls]
+    get_event_loop().run_until_complete(gather(*tasks))
+
+
+def title_clean(st):
+    _t = st
+    for _tt in (' 1 Tiers', ' 2 Tiers', ' 3 Tiers', ' 4 Tiers',
+                ' IV Tiers', ' III Tiers', ' II Tiers', ' I Tiers', ' Tiers'):
+        _t = _t.replace(_tt, '')
+    return _t
+
+
+def merc_data():
+    with open('merc_fix.json', 'r', encoding='utf-8') as f:
+        _data = loads(f.read())
+    merc_out = []
+    skill_out = []
+    item_out = []
+    for _object in _data:
+        if _object['titles']:
+            _name = _object['name']
+            _class = _object['class']
+            _titles = _object['titles']
+            _titles_a = [title_clean(title) for title in _titles]
+            s1 = _titles_a[0]
+            s2 = _titles_a[1]
+            s3 = _titles_a[2]
+            if len(_titles_a) == 6:
+                i1 = _titles_a[3]
+                i2 = _titles_a[4]
+                i3 = _titles_a[5]
+            else:
+                i1, i2, i3 = None, None, None
+            for _skill_name in (s1, s2, s3):
+                _skill_name_l = len(_skill_name)
+                _skill = {
+                    'owner': _name,
+                    'name': _skill_name,
+                }
+                for _ob_ in _object['abilities']:
+                    _ob_name = _ob_[0]
+                    _ob_level = _ob_name[-1]
+                    if len(_ob_name) - _skill_name_l == 2 and _ob_name[:_skill_name_l] == _skill_name:
+                        _ob_speed = _ob_[3].replace('Speed ', '') if _ob_[3] else ''
+                        _ob_cd = '__' + _ob_[5].replace('Cooldown ', '') if _ob_[5] else ''
+                        _skill['a' + _ob_level] = _ob_speed + _ob_cd
+                        _skill['e' + _ob_level] = _ob_[1]
+                        _skill['school'] = _ob_[6]
+                skill_out.append(_skill)
+
+            for _item_name in (i1, i2, i3):
+                if not _item_name:
+                    continue
+                _item_name_l = len(_item_name)
+                _item = {
+                    'owner': _name,
+                    'name': _item_name,
+                }
+                for _ob_ in _object['items']:
+                    _ob_name = _ob_[0]
+                    _ob_level = _ob_name[-1]
+                    if len(_ob_name) - _item_name_l == 2 and _ob_name[:_item_name_l] == _item_name:
+                        _item['e' + _ob_level] = _ob_[1]
+                item_out.append(_item)
+            _item_o = []
+            _merc = {
+                'name': _name,
+                'class': _class,
+                's1': s1,
+                's2': s2,
+                's3': s3,
+                'i1': i1,
+                'i2': i2,
+                'i3': i3,
+            }
+
+            _status = _object['status']
+            for _i in range(30):
+                _merc['a' + str(_i + 1)] = _status[_i][1] + '__' + _status[_i][2]
+            merc_out.append(_merc)
+    with open('merc_out.json', 'w', encoding='utf-8') as f:
+        print(dumps(merc_out), file=f)
+    pandas.read_json('merc_out.json').to_excel('merc_out.xlsx', index=None)
+    with open('skill_out.json', 'w', encoding='utf-8') as f:
+        print(dumps(skill_out), file=f)
+    pandas.read_json('skill_out.json').to_excel('skill_out.xlsx', index=None)
+    with open('item_out.json', 'w', encoding='utf-8') as f:
+        print(dumps(item_out), file=f)
+    pandas.read_json('item_out.json').to_excel('item_out.xlsx', index=None)
+
+
 if __name__ == '__main__':
-    dump_merc()
-    dump_data()
+    # dump_merc()
+    # dump_data()
+    # down_img()
+    merc_data()
 
     # 测试
-    # t_t = [work2('https://outof.cards/hearthstone/cards/15880-claws-of-terror-4')]
+    # t_t = [down_url('https://aaa')]
     # t_r = get_event_loop().run_until_complete(gather(*t_t))
     # print(t_r[0])
