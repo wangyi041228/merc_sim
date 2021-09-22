@@ -13,18 +13,22 @@ from PIL import Image, ImageTk, ImageDraw, ImageFont  # ImageGrab, ImageChops
 # screensize = g_s(78), g_s(79)
 font_type = os.sep.join(('font', 'GLEI00M_t.ttf'))
 font = ImageFont.truetype(font_type, size=40, index=0, encoding='unic')
-with open('data.json', 'r', encoding='utf-8') as _f_:
-    d = loads(_f_.read())
-MERC = Enum('MERC', tuple(d[0]))
+with open('data_merc.json', 'r', encoding='utf-8') as _f_:
+    d_merc = loads(_f_.read())
+with open('data_skill.json', 'r', encoding='utf-8') as _f_:
+    d_skill = loads(_f_.read())
+with open('data_item.json', 'r', encoding='utf-8') as _f_:
+    d_item = loads(_f_.read())
+MERC = Enum('MERC', tuple(d_merc[0]))
 MERC_L = {}
-for _count in range(len(d[0])):
-    MERC_L[MERC[d[0][_count]]] = d[1][_count]
+for _count in range(len(d_merc[0])):
+    MERC_L[MERC[d_merc[0][_count]]] = d_merc[1][_count]
 MERC_L_R = dict(zip(MERC_L.values(), MERC_L.keys()))
-MERC_L_CB = d[1]
+MERC_L_CB = d_merc[1]
 
 RACE = Enum('RACE',
             ('-', 'Tauren', 'Human', 'Orc', 'Beast', 'Demon', 'Murloc', 'Element', 'Night Elf', 'Gnome', 'Undead',
-             'Dwarf', 'Blood Elf', 'Troll', 'High Elf', 'Dragon', 'Draenei'))
+             'Dwarf', 'Blood Elf', 'Troll', 'Half-Orc', 'Dragon', 'Draenei'))
 RACE_L = {
     RACE['-']: '无种族',
     RACE['Tauren']: '牛头人',
@@ -40,98 +44,80 @@ RACE_L = {
     RACE['Dwarf']: '矮人',
     RACE['Blood Elf']: '血精灵',
     RACE['Troll']: '巨魔',
-    RACE['High Elf']: '高等精灵',
+    RACE['Half-Orc']: '半兽人',
     RACE['Dragon']: '龙',
     RACE['Draenei']: '德莱尼',
 }
 M_TYPE = Enum('M_TYPE', ('-', 'Protector', 'Fighter', 'Caster'))
 M_TYPE_L = {
-    M_TYPE['-']: '无业',
+    M_TYPE['-']: '中立',
     M_TYPE['Protector']: '护卫',
     M_TYPE['Fighter']: '斗士',
     M_TYPE['Caster']: '施法者',
 }
-S_TYPE = Enum('S_TYPE', ('-', 'Holy', 'Arcane'))
+S_TYPE = Enum('S_TYPE', ('-', 'Arcane', 'Fire', 'Fel', 'Frost', 'Holy', 'Nature', 'Shadow'))
 S_TYPE_L = {
     S_TYPE['-']: '无',
-    S_TYPE['Holy']: '神圣',
     S_TYPE['Arcane']: '奥术',
+    S_TYPE['Fire']: '火焰',
+    S_TYPE['Fel']: '邪能',
+    S_TYPE['Frost']: '冰霜',
+    S_TYPE['Holy']: '神圣',
+    S_TYPE['Nature']: '自然',
+    S_TYPE['Shadow']: '暗影',
 }
-SKILL = Enum('SKILL', (
-    '-',
-    # Cariel Roame
-    "Crusader's Blow",
-    'Taunt',
-    'Seal of Light',
-    # Tyrande
-    'Arcane Shot',
-    'Arcane Salvo',
-    "Elune's Grace",
-    # Xyrella
-    'Blinding Luminance',
-    'Flash Heal',
-    'Atonement',
-))
-SKILL_L = {
-    SKILL['-']: '休息',
-    SKILL["Crusader's Blow"]: '远征军打击',
-    SKILL['Taunt']: '嘲讽',
-    SKILL['Seal of Light']: '光明圣印',
-    SKILL['Arcane Shot']: '奥术射击',
-    SKILL['Arcane Salvo']: '奥术齐射',
-    SKILL["Elune's Grace"]: '艾露恩的赐福',
-    SKILL['Blinding Luminance']: '致盲之光',
-    SKILL['Flash Heal']: '快速治疗',
-    SKILL['Atonement']: '救赎',
-}
+
+SKILL = Enum('SKILL', tuple(d_skill[0]))
+SKILL_L = {}
+SKILL_D = {}
+SKILL_L_CB_F = {}
+for _count in range(len(d_skill[0])):
+    SKILL_L[SKILL[d_skill[0][_count]]] = d_skill[1][_count]
+    s_cd = []
+    for _ii in range(1, 6):
+        _t_ = d_skill[2 + _ii][_count]
+        if _t_ is str and '__' in _t_:
+            s_c = _t_.split('__')
+            _s_, _cd_ = int(s_c[0]), int(s_c[1])
+        else:
+            _s_, _cd_ = _t_, 0
+        s_cd.append((_s_, d_skill[7 + _ii][_count], _cd_))
+    SKILL_D[SKILL[d_skill[0][_count]]] = [S_TYPE[d_skill[2][_count]]] + s_cd
 SKILL_L_R = dict(zip(SKILL_L.values(), SKILL_L.keys()))
-SKILL_L_CB = tuple(SKILL_L.values())
-
-SKILL_D = {
-    SKILL['-']: [S_TYPE['-']] + [(114, '为什么佣兵战纪不能休息？')] * 5,
-    SKILL["Crusader's Blow"]: [S_TYPE['Holy']] + [(6, '攻击一个敌人。击杀：为此佣兵恢复10点生命值。')] * 5,
-    SKILL['Taunt']: [S_TYPE['-']] + [(1, '为此佣兵恢复4点生命值，并使其在本回合中获得嘲讽。')] * 5,
-    SKILL['Seal of Light']: [S_TYPE['Holy']] + [(4, '选择一个角色，使其获得+2攻击力并为其恢复5点生命值。')] * 5,
-    SKILL['Arcane Shot']: [S_TYPE['Arcane']] + [(7, '对一个敌人造成4点伤害。')] * 5,
-    SKILL['Arcane Salvo']: [S_TYPE['Arcane']] + [(5, '随机对两个敌人造成2点伤害。')] * 5,
-    SKILL["Elune's Grace"]: [S_TYPE['Arcane']] + [(6, '你的队伍的下一个奥术技能会施放两次，且速度值永久加快（1）点。')] * 5,
-    SKILL['Blinding Luminance']: [S_TYPE['Holy']] + [(3, '对一个敌人造成2点伤害，并使其在本回合获得-2攻击力。')] * 5,
-    SKILL['Flash Heal']: [S_TYPE['Holy']] + [(4, '恢复5点生命值。')] * 5,
-    SKILL['Atonement']: [S_TYPE['Holy']] + [(9, '造成9点伤害。你的队伍每恢复20点生命值，伤害+1。')] * 5,
-}
-
+SKILL_L_CB = d_skill[1]
 SKILL_LEVEL_CB = (1, 2, 3, 4, 5)
 SKILL_TARGET_CB = (0, 1, 2, 3, 4, 5, 6, 7, -1, -2, -3, -4, -5, -6, -7)
 
-ITEM = Enum('ITEM', (
-    '-',
-    'Hammer of Dawn',
-    'Tome of Light',
-    'Tome of Judgement',
-))
-ITEM_L = {
-    ITEM['-']: '无装备',
-    ITEM['Hammer of Dawn']: '黎明之锤',
-    ITEM['Tome of Light']: '圣光秘典',
-    ITEM['Tome of Judgement']: '裁决秘典',
-}
+ITEM = Enum('ITEM', tuple(d_item[0]))
+ITEM_L = {}
+ITEM_D = {}
+for _count in range(len(d_item[0])):
+    ITEM_L[ITEM[d_item[0][_count]]] = d_item[1][_count]
+    m_l = 2
+    while not d_item[m_l][_count]:
+        m_l += 1
+    ITEM_D[ITEM[d_item[0][_count]]] = [m_l - 1, d_item[2][_count], d_item[3][_count], d_item[4][_count], d_item[5][_count]]
 ITEM_L_R = dict(zip(ITEM_L.values(), ITEM_L.keys()))
-ITEM_L_CB = tuple(ITEM_L.values())
-ITEM_D = {
-    ITEM['-']: ['没有装备。'] * 5,
-    ITEM['Hammer of Dawn']: ['远征军打击还会为相邻的佣兵恢复生命值。'] * 5,
-    ITEM['Tome of Light']: ['被动：当此佣兵具有嘲讽时，具有+2攻击力。'] * 5,
-    ITEM['Tome of Judgement']: ['光明圣印额外使目标获得+1攻击力。'] * 5,
-}
+ITEM_L_CB = d_item[1]
+ITEM_L_CB_F = {}
 ITEM_LEVEL_CB = (1, 2, 3, 4)
 
 D = {}
-for _count in range(len(d[0])):
-    _a_ = d[10][_count].split('_')
-    _abi = int(_a_[0]), int(_a_[1])
-    D[MERC[d[0][_count]]] = (M_TYPE[d[2][_count]], RACE[d[3][_count]],
-                             (ITEM[d[4][_count]], ITEM[d[5][_count]], ITEM[d[6][_count]]),
-                             (SKILL[d[7][_count]], SKILL[d[8][_count]], SKILL[d[9][_count]]), tuple([_abi] * 31))
+for _count in range(len(d_merc[0])):
+    # 12到41是攻防
+    a_h = [(1, 1)]
+    for _cc in range(12, 42):
+        _a_ = d_merc[_cc][_count].split('__')
+        a_h.append((int(_a_[0]), int(_a_[1])))
+    D[MERC[d_merc[0][_count]]] = [M_TYPE[d_merc[2][_count]], RACE[d_merc[3][_count]],
+                                  (ITEM[d_merc[4][_count]], ITEM[d_merc[5][_count]],
+                                   ITEM[d_merc[6][_count]], ITEM[d_merc[7][_count]]),
+                                  (SKILL[d_merc[8][_count]], SKILL[d_merc[9][_count]],
+                                   SKILL[d_merc[10][_count]], SKILL[d_merc[11][_count]]), a_h]
+    SKILL_L_CB_F[MERC[d_merc[0][_count]]] = [SKILL_L[SKILL['-']], SKILL_L[SKILL[d_merc[8][_count]]], SKILL_L[SKILL[d_merc[9][_count]]],
+                                             SKILL_L[SKILL[d_merc[10][_count]]], SKILL_L[SKILL[d_merc[11][_count]]]]
+    ITEM_L_CB_F[MERC[d_merc[0][_count]]] = [ITEM_L[ITEM['-']], ITEM_L[ITEM[d_merc[4][_count]]], ITEM_L[ITEM[d_merc[5][_count]]],
+                                            ITEM_L[ITEM[d_merc[6][_count]]], ITEM_L[ITEM[d_merc[7][_count]]]]
 L = 30  # 初始等级
 M_SET = [(MERC[n], L, D[MERC[n]][4][L][0], D[MERC[n]][4][L][1], 0, 0, (ITEM['-'], 1), (SKILL['-'], 1, 0), ()) for n in (
     '-', 'Cariel Roame', 'Tyrande', 'Xyrella')]
@@ -200,9 +186,11 @@ class MainWindow(Tk):
                     _x = _i * 205 + 50
                     _merc_name = merc[0]
                     _level = merc[1]
-                    _item = merc[4]
+                    _item = merc[6]
                     if not _item:
-                        _item = (ITEM['-'], 1, 0)
+                        _item = (ITEM['-'], 1)
+                    elif _item[1] < ITEM_D[_item[0]][0]:
+                        _item = (_item[0], ITEM_D[_item[0]][0])
                     _skill = merc[7]
                     if not _skill:
                         _skill = (SKILL['-'], 1, 0)
@@ -239,8 +227,8 @@ class MainWindow(Tk):
                     _hp_buff_entry.pack()
                     _hp_buff_entry.place(x=135 + _x, y=25 + _y)
 
-                    _item_combobox = Combobox(self, width=10)
-                    _item_combobox['values'] = ITEM_L_CB
+                    _item_combobox = Combobox(self, width=12)
+                    _item_combobox['values'] = ITEM_L_CB_F[_merc_name] + ITEM_L_CB
                     _item_combobox.set(ITEM_L[_item[0]])
                     _item_combobox.pack()
                     _item_combobox.place(x=0 + _x, y=50 + _y)
@@ -249,10 +237,10 @@ class MainWindow(Tk):
                     _item_level_combobox['values'] = ITEM_LEVEL_CB
                     _item_level_combobox.set(_item[1])
                     _item_level_combobox.pack()
-                    _item_level_combobox.place(x=95 + _x, y=50 + _y)
+                    _item_level_combobox.place(x=115 + _x, y=50 + _y)
 
-                    _skill_combobox = Combobox(self, width=10)
-                    _skill_combobox['values'] = SKILL_L_CB
+                    _skill_combobox = Combobox(self, width=12)
+                    _skill_combobox['values'] = SKILL_L_CB_F[_merc_name] + SKILL_L_CB
                     _skill_combobox.set(SKILL_L[_skill[0]])
                     _skill_combobox.pack()
                     _skill_combobox.place(x=0 + _x, y=75 + _y)
@@ -261,13 +249,13 @@ class MainWindow(Tk):
                     _skill_level_combobox['values'] = SKILL_LEVEL_CB
                     _skill_level_combobox.set(_skill[1])
                     _skill_level_combobox.pack()
-                    _skill_level_combobox.place(x=95 + _x, y=75 + _y)
+                    _skill_level_combobox.place(x=115 + _x, y=75 + _y)
 
                     _skill_target_combobox = Combobox(self, width=2)
                     _skill_target_combobox['values'] = SKILL_TARGET_CB
                     _skill_target_combobox.set(_skill[2])
                     _skill_target_combobox.pack()
-                    _skill_target_combobox.place(x=135 + _x, y=75 + _y)
+                    _skill_target_combobox.place(x=155 + _x, y=75 + _y)
 
                     _update_button = Button(self, text=MERC_L[_merc_name], width=15)
                     _update_button.pack()
@@ -308,15 +296,16 @@ class MainWindow(Tk):
                     self.log(_log)
                     _item = ITEM_L_R[_d[6]]
                     if _item != ITEM['-']:
-                        _s = ITEM_D[_item][0][int(_d[7])]
-                        _log = f'　　装备了【{_d[8]}{_d[7]}】。\n　　{_s}\n'
+                        _s = ITEM_D[_item][int(_d[7])]
+                        _log = f'　　装备了【{_d[6]}{_d[7]}】。\n　　{_s}\n'
                         self.log(_log)
                     _skill = SKILL_L_R[_d[8]]
                     if _skill != SKILL['-']:
                         _t = SKILL_D[_skill][0]
-                        _s, _line = SKILL_D[_skill][int(_d[9])]
+                        _s, _line, _cd = SKILL_D[_skill][int(_d[9])]
                         _p = f'对【{_d[10]}】号位' if _d[6] != '0' else ''
-                        _log = f'　　{_p}预备【{_d[8]}{_d[9]}】。\n　　{str(_s)}速，{S_TYPE_L[_t]}属性，{_line}\n'
+                        _cd_l = str(_cd) + '回合冷却，' if _cd else ''
+                        _log = f'　　{_p}预备【{_d[8]}{_d[9]}】。\n　　{str(_s)}速，{_cd_l}{S_TYPE_L[_t]}属性，{_line}\n'
                         self.log(_log)
 
             self.log(f'\n手动结算技能，之后开始第{str(self.t)}回合，重新下令。\n')
@@ -360,6 +349,8 @@ class MainWindow(Tk):
             _widgets[pos][2].insert(0, str(_atk))
             _widgets[pos][3].delete(0, END)
             _widgets[pos][3].insert(0, str(_hp))
+            _widgets[pos][6]['values'] = ITEM_L_CB_F[_merc] + ITEM_L_CB
+            _widgets[pos][8]['values'] = SKILL_L_CB_F[_merc] + SKILL_L_CB
 
         def update_button(self, event):
             if event.widget in self.widgets_update_1:
@@ -397,6 +388,11 @@ class MainWindow(Tk):
                     w_a.insert(0, _b)
                     w_b.delete(0, END)
                     w_b.insert(0, _a)
+                elif i == 6 or i == 8:
+                    _aa, _bb = w_a['values'], w_b['values']
+                    w_a['values'], w_b['values'] = _bb, _aa
+                    w_b.set(_a)
+                    w_a.set(_b)
                 else:
                     w_b.set(_a)
                     w_a.set(_b)
@@ -404,6 +400,7 @@ class MainWindow(Tk):
             _b = _w[_id + 1]['text']
             _w[_id].config(text=_b)
             _w[_id + 1].config(text=_a)
+
             if _target[_id][0].get() != _b:
                 self.update_merc(_c, _id)
             if _target[_id + 1][0].get() != _a:
@@ -426,13 +423,15 @@ class MainWindow(Tk):
                 _d2 = pow((_x0 - _x1), 2) + pow((_y0 - _y1), 2)
                 if _d2 > 3000:
                     _draw = ImageDraw.ImageDraw(self.canvas_paint)
-                    _draw.line(((_x0, _y0), (_x1, _y1)), fill=_color, width=10)
                     _v1, _v2 = _y0 - _y1, _x1 - _x0
                     _sv = pow(pow(_v1, 2) + pow(_v2, 2), 0.5) / 20
                     _sv2 = _sv / 2
-                    _p1 = int((_x1 - _x0) / _sv2) + _x1, int((_y1 - _y0) / _sv2) + _y1
-                    _p2 = _x1 + int(_v1 / _sv),  _y1 + int(_v2 / _sv)
-                    _p3 = _x1 - int(_v1 / _sv),  _y1 - int(_v2 / _sv)
+                    _draw.line(((_x0, _y0), (_x1 - int((_x1 - _x0) / _sv2), _y1 - int((_y1 - _y0) / _sv2))
+                                ), fill=_color, width=10)
+
+                    _p1 = _x1, _y1
+                    _p2 = _x1 + int(_v1 / _sv) - int((_x1 - _x0) / _sv2), _y1 + int(_v2 / _sv) - int((_y1 - _y0) / _sv2)
+                    _p3 = _x1 - int(_v1 / _sv) - int((_x1 - _x0) / _sv2), _y1 - int(_v2 / _sv) - int((_y1 - _y0) / _sv2)
                     _draw.polygon((_p1, _p2, _p3), fill=_color, outline=_color)
                     self.update_canvas()
 
@@ -546,7 +545,7 @@ class MainWindow(Tk):
             value='欢迎使用佣兵沙盘DEMO。\n数值不完整，某些操作会报错。\n切技能换目标不需要点更新英雄。\n更新英雄会同刷新图片。未来可能补自'
                   '动结算。\n日志可擦除。\n在棋盘上拖动会画箭头，下面起点为绿色，上面起点为红色，左侧全部刷新擦除箭头。\n每个佣兵的控件依次对'
                   '应：\n【名称】【等级】\n【攻击力】【生命值】\n【装备】【等级】\n【技能】【等级】【目标】\n'
-)
+        )
         self.log_label = Text(self)
         self.log_label.insert(END, self.log.get())
         self.log_label.pack(expand=1, fill=BOTH)
